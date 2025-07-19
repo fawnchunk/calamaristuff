@@ -286,6 +286,21 @@ function Run-SystemCheck {
     $virt       = (Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled
     try { $ip = Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 3 } catch { $ip = 'Unknown' }
     
+    # Get Windows release version (22H2, 23H2, etc)
+    $releaseVer = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name "DisplayVersion" -ErrorAction SilentlyContinue).DisplayVersion
+    if (-not $releaseVer) {
+        $releaseVer = (Get-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion" -Name "ReleaseId" -ErrorAction SilentlyContinue).ReleaseId
+    }
+    if (-not $releaseVer) { $releaseVer = "Unknown" }
+    
+    # Check Fast Boot status
+    $fastBoot = (Get-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Power" -Name "HiberbootEnabled" -ErrorAction SilentlyContinue).HiberbootEnabled
+    if ($fastBoot -eq 1) {
+        $fastBootStatus = "Enabled"
+    } else {
+        $fastBootStatus = "Disabled"
+    }
+    
     # Add results to panel
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{
         Text = "Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
@@ -304,6 +319,7 @@ function Run-SystemCheck {
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "OS Name: $($os.Caption)"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Version: $($os.Version)"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Build: $($os.BuildNumber)"}))
+    $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Release: $releaseVer"}))
     
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{
         Text = "HARDWARE"
@@ -327,10 +343,10 @@ function Run-SystemCheck {
     
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "TPM Present: $([bool]($tpm -ne $null))"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "TPM Enabled: $($tpm.Enabled -as [string])"}))
-    $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "TPM Version: $($tpm.SpecVersion -as [string])"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Secure Boot: $secureBoot"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Virtualization: $virt"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Windows Defender: $defender"}))
+    $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Fast Boot: $fastBootStatus"}))
     
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{
         Text = "NETWORK"
