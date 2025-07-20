@@ -14,7 +14,7 @@ $Passwords = @{
 
 # Download URLs configuration
 $DownloadUrls = @{
-    GigabyteBiosFlasher = "https://github.com/fawnchunk/calamaristuff/raw/refs/heads/main/jwb0vH4.zip"
+    GigabyteBiosFlasher = "https://github.com/fawnchunk/calamaristuff/raw/refs/heads/main/UpdPack_B24.0315.1.exe"
     SmbiosFixer = "https://github.com/fawnchunk/calamaristuff/raw/refs/heads/main/jwb0vH4.zip"
     Dcontrol = "https://github.com/fawnchunk/calamaristuff/raw/refs/heads/main/dcontrol.zip"
 }
