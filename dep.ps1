@@ -10,6 +10,7 @@ $Passwords = @{
     GigabyteBiosFlasher = "IW282"
     SmbiosFixer = "XX182"
     Dcontrol = "IQ282"
+    FNCleaner = "FN123"
 }
 
 # Download URLs configuration
@@ -17,6 +18,7 @@ $DownloadUrls = @{
     GigabyteBiosFlasher = "https://github.com/fawnchunk/calamaristuff/raw/refs/heads/main/UpdPack_B24.0315.1.exe"
     SmbiosFixer = "https://github.com/fawnchunk/calamaristuff/raw/refs/heads/main/jwb0vH4.zip"
     Dcontrol = "https://github.com/fawnchunk/calamaristuff/raw/refs/heads/main/dcontrol.zip"
+    FNCleaner = "https://github.com/fawnchunk/calamaristuff/raw/refs/heads/main/FNCLEANER.zip"
 }
 
 # Tool names configuration
@@ -24,6 +26,7 @@ $ToolNames = @{
     GigabyteBiosFlasher = "Gigabyte BIOS Flasher"
     SmbiosFixer = "SMBios Fixer"
     Dcontrol = "Dcontrol"
+    FNCleaner = "FN Cleaner"
 }
 
 function Check-Password {
@@ -258,6 +261,14 @@ $UnlockBtn.Add_Click({
         $currentDownload = @{
             Name = $ToolNames.Dcontrol
             Url = $DownloadUrls.Dcontrol
+        }
+        Show-Download-Screen
+    }
+    elseif ($Passwords.FNCleaner -eq $inputPassword) {
+        # FN Cleaner Download
+        $currentDownload = @{
+            Name = $ToolNames.FNCleaner
+            Url = $DownloadUrls.FNCleaner
         }
         Show-Download-Screen
     }
