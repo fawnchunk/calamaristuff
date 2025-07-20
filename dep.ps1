@@ -212,6 +212,7 @@ $DownloadScreenToolName = $Window.FindName("DownloadScreenToolName")
 # Global variables
 $currentDownload = $null
 $webClient = $null
+$script:systemCheckResults = $null
 
 # Close window handler
 $CloseWindowBtn.Add_Click({ $Window.Close() })
@@ -281,9 +282,18 @@ function Run-SystemCheck {
     $cs  = Get-CimInstance Win32_ComputerSystem
     $bios= Get-CimInstance Win32_BIOS
     $tpm = Get-WmiObject -Namespace "Root\CIMv2\Security\MicrosoftTpm" -Class Win32_Tpm -ErrorAction SilentlyContinue
-    $secureBoot = (Confirm-SecureBootUEFI -ErrorAction SilentlyContinue)
-    $defender   = (Get-MpComputerStatus).RealTimeProtectionEnabled
-    $virt       = (Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled
+    
+    # FIXED: Better secure boot check
+    $secureBoot = "off"
+    try {
+        $secureBootState = Confirm-SecureBootUEFI -ErrorAction Stop
+        $secureBoot = if ($secureBootState) { "on" } else { "off" }
+    } catch {
+        $secureBoot = "off"
+    }
+    
+    $defender   = if ((Get-MpComputerStatus).RealTimeProtectionEnabled) { "on" } else { "off" }
+    $virt       = if ((Get-CimInstance Win32_Processor).VirtualizationFirmwareEnabled) { "on" } else { "off" }
     try { $ip = Invoke-RestMethod -Uri 'https://api.ipify.org' -TimeoutSec 3 } catch { $ip = 'Unknown' }
     
     # Get Windows release version (22H2, 23H2, etc)
@@ -299,6 +309,32 @@ function Run-SystemCheck {
         $fastBootStatus = "Enabled"
     } else {
         $fastBootStatus = "Disabled"
+    }
+    
+    # TPM Enabled check
+    $tpmEnabled = "off"
+    if ($tpm -and $tpm.IsEnabled()) {
+        $tpmEnabled = "on"
+    }
+    
+    # Store results for clipboard formatting
+    $script:systemCheckResults = @{
+        Generated = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+        OSName = $os.Caption
+        OSVersion = $os.Version
+        OSBuild = $os.BuildNumber
+        ReleaseVersion = $releaseVer
+        Manufacturer = $cs.Manufacturer
+        Model = $cs.Model
+        Processor = $cs.Name
+        Cores = $cs.NumberOfLogicalProcessors
+        RAM = [Math]::Round($cs.TotalPhysicalMemory/1GB,2)
+        TPMEnabled = $tpmEnabled
+        SecureBoot = $secureBoot
+        Virtualization = $virt
+        Defender = $defender
+        FastBoot = $fastBootStatus
+        IP = $ip
     }
     
     # Add results to panel
@@ -341,8 +377,7 @@ function Run-SystemCheck {
         Margin = "0,10,0,5"
     }))
     
-    $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "TPM Present: $([bool]($tpm -ne $null))"}))
-    $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "TPM Enabled: $($tpm.Enabled -as [string])"}))
+    $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "TPM Enabled: $tpmEnabled"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Secure Boot: $secureBoot"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Virtualization: $virt"}))
     $CheckResultsPanel.Children.Add((New-Object Windows.Controls.TextBlock -Property @{Text = "Windows Defender: $defender"}))
@@ -360,12 +395,30 @@ function Run-SystemCheck {
 
 # Copy results to clipboard
 $CopyResultsBtn.Add_Click({
-    $textToCopy = ""
-    foreach ($child in $CheckResultsPanel.Children) {
-        if ($child -is [System.Windows.Controls.TextBlock]) {
-            $textToCopy += $child.Text + "`r`n"
-        }
-    }
+    $textToCopy = "Generated: $($script:systemCheckResults.Generated)`r`n`r`n"
+    $textToCopy += "==**OPERATING SYSTEM**==`r`n`r`n"
+    $textToCopy += "OS Name: $($script:systemCheckResults.OSName)`r`n"
+    $textToCopy += "Version: $($script:systemCheckResults.OSVersion)`r`n"
+    $textToCopy += "Build: $($script:systemCheckResults.OSBuild)`r`n"
+    $textToCopy += "Release: **$($script:systemCheckResults.ReleaseVersion)**`r`n`r`n"
+    
+    $textToCopy += "==**HARDWARE**==`r`n`r`n"
+    $textToCopy += "Manufacturer: $($script:systemCheckResults.Manufacturer)`r`n"
+    $textToCopy += "Model: $($script:systemCheckResults.Model)`r`n"
+    $textToCopy += "Processor: $($script:systemCheckResults.Processor)`r`n"
+    $textToCopy += "CPU Cores: $($script:systemCheckResults.Cores)`r`n"
+    $textToCopy += "Total RAM: $($script:systemCheckResults.RAM) GB`r`n`r`n"
+    
+    $textToCopy += "==**SECURITY**==`r`n`r`n"
+    $textToCopy += "TPM Enabled: **$($script:systemCheckResults.TPMEnabled)**`r`n"
+    $textToCopy += "Secure Boot: **$($script:systemCheckResults.SecureBoot)**`r`n"
+    $textToCopy += "Virtualization: **$($script:systemCheckResults.Virtualization)**`r`n"
+    $textToCopy += "Windows Defender: **$($script:systemCheckResults.Defender)**`r`n"
+    $textToCopy += "Fast Boot: $($script:systemCheckResults.FastBoot)`r`n`r`n"
+    
+    $textToCopy += "==**NETWORK**==`r`n"
+    $textToCopy += "||IP Address: $($script:systemCheckResults.IP)||"
+    
     [System.Windows.Forms.Clipboard]::SetText($textToCopy)
     [System.Windows.MessageBox]::Show('Results copied to clipboard!','Success','OK','Information')
 })
