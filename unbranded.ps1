@@ -31,6 +31,66 @@ function Check-Password {
     return $userInput -eq $correctPassword
 }
 
+# Improved TPM detection function
+function Get-TpmStatus {
+    $tpmEnabled = "off"
+    try {
+        # Method 1: Use Get-Tpm cmdlet
+        $tpm = Get-Tpm -ErrorAction Stop
+        if ($tpm.TpmPresent -and $tpm.TpmReady) {
+            $tpmEnabled = "on"
+            return $tpmEnabled
+        }
+    } catch { }
+
+    try {
+        # Method 2: Check registry directly
+        $tpmActivated = Get-ItemPropertyValue -Path "HKLM:\SYSTEM\CurrentControlSet\Services\TPM\WMI" -Name "IsActivated_0" -ErrorAction Stop
+        $tpmEnabledVal = Get-ItemPropertyValue -Path "HKLM:\SYSTEM\CurrentControlSet\Services\TPM\WMI" -Name "IsEnabled_0" -ErrorAction Stop
+        if ($tpmActivated -eq 1 -and $tpmEnabledVal -eq 1) {
+            $tpmEnabled = "on"
+        }
+    } catch { 
+        try {
+            # Method 3: Check WMI
+            $tpm = Get-WmiObject -Namespace "root\cimv2\Security\MicrosoftTpm" -Class Win32_Tpm -ErrorAction Stop
+            if ($tpm -and $tpm.IsActivated().ReturnValue -eq 1 -and $tpm.IsEnabled().ReturnValue -eq 1) {
+                $tpmEnabled = "on"
+            }
+        } catch { }
+    }
+    return $tpmEnabled
+}
+
+# Improved Secure Boot detection function
+function Get-SecureBootStatus {
+    $secureBoot = "off"
+    try {
+        # Method 1: Standard cmdlet
+        if (Confirm-SecureBootUEFI -ErrorAction Stop) {
+            $secureBoot = "on"
+            return $secureBoot
+        }
+    } catch { }
+
+    try {
+        # Method 2: Check registry directly
+        $regVal = Get-ItemPropertyValue -Path "HKLM:\SYSTEM\CurrentControlSet\Control\SecureBoot\State" -Name "UEFISecureBootEnabled" -ErrorAction Stop
+        if ($regVal -eq 1) {
+            $secureBoot = "on"
+        }
+    } catch { 
+        try {
+            # Method 3: Check firmware via WMI
+            $firmware = Get-WmiObject -Class Win32_ComputerSystem -ErrorAction Stop
+            if ($firmware.SecureBootEnabled -eq $true) {
+                $secureBoot = "on"
+            }
+        } catch { }
+    }
+    return $secureBoot
+}
+
 $Xaml = @"
 <Window 
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
@@ -103,7 +163,7 @@ $Xaml = @"
                                     Cursor="Hand" BorderThickness="0"/>
                         </StackPanel>
                         
-                        <Button x:Name="WebsiteBtn" Content="https://zany-6853.pagelet.host/" 
+                        <Button x:Name="WebsiteBtn" Content="my website" 
                                 Background="Transparent" Foreground="#03DAC6" 
                                 FontSize="12" FontWeight="Bold" Margin="0,20,0,0"
                                 Padding="0" BorderThickness="0" Cursor="Hand"
@@ -509,22 +569,14 @@ function Run-SystemCheck {
     }
     catch { $release = "Unknown" }
     
-    $secureBoot = "off"
-    try {
-        $secureBootState = Confirm-SecureBootUEFI -ErrorAction Stop
-        $secureBoot = if ($secureBootState) { "on" } else { "off" }
-    } catch { $secureBoot = "off" }
+    # Use improved detection functions
+    $secureBoot = Get-SecureBootStatus
+    $tpmEnabled = Get-TpmStatus
     
     $defender   = if ((Get-MpComputerStatus).RealTimeProtectionEnabled) { "on" } else { "off" }
     $virt       = Get-VirtualizationStatus
     $fastBoot   = Get-FastBootStatus
     $firmwareType = Get-FirmwareType
-    
-    $tpmEnabled = "off"
-    try {
-        $tpm = Get-Tpm -ErrorAction Stop
-        $tpmEnabled = if ($tpm.TpmPresent -and $tpm.TpmReady) { "on" } else { "off" }
-    } catch { $tpmEnabled = "off" }
     
     $vgkDetected = Test-Path "C:\Windows\System32\drivers\vgk.sys"
     
